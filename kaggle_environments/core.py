@@ -155,16 +155,16 @@ class Environment:
             action_state[index] = {**self.state[index], "action": None}
 
             if isinstance(action, DeadlineExceeded):
-                self.__debug_print(f"Timeout: {str(action)}")
+                self.debug_print(f"Timeout: {str(action)}")
                 action_state[index]["status"] = "TIMEOUT"
             elif isinstance(action, BaseException):
-                self.__debug_print(f"Error: {str(action)}")
+                self.debug_print(f"Error: {str(action)}")
                 action_state[index]["status"] = "ERROR"
             else:
                 err, data = process_schema(
                     self.__state_schema.properties.action, action)
                 if err:
-                    self.__debug_print(f"Invalid Action: {str(err)}")
+                    self.debug_print(f"Invalid Action: {str(err)}")
                     action_state[index]["status"] = "INVALID"
                 else:
                     action_state[index]["action"] = data
@@ -191,7 +191,7 @@ class Environment:
         Returns:
             list of list of dict: The agent states of all steps executed.
         """
-        if self.state == None or self.done:
+        if self.state == None or len(self.steps) == 1 or self.done:
             self.reset(len(agents))
         if len(self.state) != len(agents):
             raise InvalidArgument(
@@ -498,7 +498,7 @@ class Environment:
                 *args[:self.interpreter.__code__.co_argcount]))
             for agent in new_state:
                 if agent.status not in self.__state_schema.properties.status.enum:
-                    self.__debug_print(f"Invalid Action: {agent.status}")
+                    self.debug_print(f"Invalid Action: {agent.status}")
                     agent.status = "INVALID"
                 if agent.status in ["ERROR", "INVALID", "TIMEOUT"]:
                     agent.reward = None
@@ -574,14 +574,15 @@ class Environment:
 
         def destroy():
             for a in agents:
-                a.destroy()
+                if a != None:
+                    a.destroy()
 
         return structify({"act": act, "destroy": destroy})
 
     def __get_shared_state(self, position):
         if position == 0:
             return self.state[0]
-        state = copy.deepcopy(self.state[1])
+        state = copy.deepcopy(self.state[position])
 
         # Note: state and schema are required to be in sync (apart from shared ones).
         def update_props(shared_state, state, schema_props):
@@ -594,6 +595,6 @@ class Environment:
 
         return update_props(self.state[0], state, self.__state_schema.properties)
 
-    def __debug_print(self, message):
+    def debug_print(self, message):
         if self.debug:
             print(message)
